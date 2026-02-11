@@ -12,9 +12,7 @@ app.use(express.json());
 
 // Database Connection
 // Database Connection
-mongoose.connect(
-  "mongodb+srv://atlasuser:Atlas1234@cluster0.xxxxx.mongodb.net/ceepee_db?retryWrites=true&w=majority"
-)
+mongoose.connect(process.env.MONGO_URI)
 
     .then(() => console.log('MongoDB Connected'))
     .catch(err => console.error('MongoDB connection error:', err));
