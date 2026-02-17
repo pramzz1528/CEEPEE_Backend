@@ -5,6 +5,15 @@ const mongoose = require('mongoose');
 const Material = require('../models/Material');
 const Room = require('../models/Room');
 const { generateImage, generateText } = require('../services/googleAIService');
+const multer = require('multer');
+const { visualizeTile } = require('../controllers/visualizerController');
+
+// Configure Multer for memory storage (buffer access)
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+});
 
 /* =====================================================
    1️⃣ GET ALL PRESET ROOMS
@@ -30,6 +39,47 @@ router.get('/materials', async (req, res) => {
   }
 });
 
+
+
+/* =====================================================
+   3️⃣ AI SUGGESTIONS (MISSING ROUTE ADDED)
+===================================================== */
+router.post('/ai-suggest', async (req, res) => {
+  try {
+    const { currentMaterial, availableMaterials } = req.body;
+
+    // Validate inputs
+    if (!currentMaterial || !availableMaterials || !Array.isArray(availableMaterials)) {
+      return res.json({ suggestedIds: [] }); // Fail gracefully
+    }
+
+    const prompt = `
+    You are an interior design expert.
+    I have a room with "${currentMaterial.name}" (${currentMaterial.colorFamily}, ${currentMaterial.finish}).
+    
+    From the following list of available tiles, suggest 3 that would go well with this tile for a modern look.
+    Return ONLY a JSON array of their IDs.
+    
+    Available Tiles:
+    ${JSON.stringify(availableMaterials.map(m => ({ id: m.id || m._id, name: m.name, color: m.colorFamily })))}
+    `;
+
+    const text = await generateText(prompt);
+
+    // Extract JSON array from text
+    const jsonMatch = text.match(/\[.*\]/s);
+    if (jsonMatch) {
+      const suggestedIds = JSON.parse(jsonMatch[0]);
+      res.json({ suggestedIds });
+    } else {
+      res.json({ suggestedIds: [] });
+    }
+
+  } catch (error) {
+    console.error("AI Suggest Error:", error);
+    res.status(500).json({ error: "Failed to generate suggestions" });
+  }
+});
 
 
 /* =====================================================
@@ -83,5 +133,13 @@ Requirements:
     res.status(500).json({ error: 'Visualization failed' });
   }
 });
+
+/* =====================================================
+   5️⃣ VISUALIZE TILES (CUSTOM UPLOAD)
+   ===================================================== */
+router.post('/visualize-tiles', upload.fields([
+  { name: 'room', maxCount: 1 },
+  { name: 'tile', maxCount: 1 }
+]), visualizeTile);
 
 module.exports = router;

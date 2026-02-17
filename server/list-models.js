@@ -1,8 +1,10 @@
 
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-require('dotenv').config();
+const path = require('path');
+const dotenvPath = path.resolve(__dirname, '.env');
+require('dotenv').config({ path: dotenvPath });
 
-const apiKey = process.env.GEMINI_API_KEY || process.env.NANO_BANANA_API_KEY;
+const apiKey = process.env['GEMINI_FLASH_2.5_KEY'] || process.env.GEMINI_API_KEY || process.env.NANO_BANANA_API_KEY;
 const genAI = new GoogleGenerativeAI(apiKey);
 
 async function listModels() {
@@ -18,12 +20,15 @@ async function listModels() {
         const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
         const response = await axios.get(url);
 
-        console.log("Available Models:");
+        const fs = require('fs');
+        const outputParams = [];
         if (response.data && response.data.models) {
             response.data.models.forEach(m => {
-                console.log(`- ${m.name} (${m.supportedGenerationMethods.join(', ')})`);
+                outputParams.push(`- ${m.name} (${m.supportedGenerationMethods.join(', ')})`);
             });
         }
+        fs.writeFileSync(path.join(__dirname, 'models_output.txt'), outputParams.join('\n'));
+        console.log("Written to models_output.txt");
     } catch (error) {
         console.error("Error listing models:", error.message);
         if (error.response) {

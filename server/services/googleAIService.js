@@ -200,105 +200,90 @@ const matchRoomAndTile = async (prompt, rooms, materials) => {
 };
 
 const visualizeTiles = async (roomBuffer, tileBuffer, roomMime, tileMime) => {
-    // 1. Get API Key (Prefer specialized key, fallback to general key)
-    const apiKey = process.env.GEMINI_FLASH_25_KEY || process.env.GEMINI_API_KEY;
+    // User requested "Gemini 2.5" key.
+    // We Map 'GEMINI_FLASH_2.5_KEY' to this function.
+    // Note: dot notation for env var with dot needs bracket request types usually: process.env['GEMINI_FLASH_2.5_KEY']
+    const apiKey = process.env['GEMINI_FLASH_2.5_KEY'] || process.env.GEMINI_API_KEY;
     if (!apiKey) {
-        throw new Error('AI API Key is not configured (GEMINI_FLASH_25_KEY or GEMINI_API_KEY)');
+        throw new Error('AI API Key is not configured (checked GEMINI_FLASH_2.5_KEY)');
     }
 
-    // 2. Define Models to Try (Priority Order)
-    const modelsToTry = [
-        "gemini-2.5-flash-image",
-        "gemini-2.0-flash-exp-image-generation",
-        "gemini-2.0-flash-exp"
-    ];
+    const genAI = new GoogleGenerativeAI(apiKey);
+    // Assuming "gemini 2.5" refers to the model associated with this key, or the latest flash.
+    // Current latest is gemini-2.0-flash or gemini-1.5-flash. Users often round up or misremember numbers.
+    // User requested "Gemini 2.5".
+    // "gemini-2.5-flash-image" is available and likely the correct model for image generation tasks.
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-image" });
 
-    // Helper to try a model
-    const tryModel = async (modelName) => {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+    try {
+        console.log(`[Service] Trying visualization with model: gemini-2.5-flash-image using provided specialized key.`);
 
         const prompt = `
         ACT AS AN EXPERT ARCHITECTURAL VISUALIZER.
-
-        INPUTS:
-        - Image 1: "Room" (Existing interior).
-        - Image 2: "Material" (Tile/Flooring texture).
-
-        YOUR TASK:
-        Generate a high-fidelity photorealistic rendering of the "Room" with the "Material" applied to the floor.
-
-        STRICT RULES:
-        1. **FLOOR DETECTION**: Identify the floor area accurately. Do NOT paint over furniture, rugs, wall baseboards, or people.
-        2. **PERSPECTIVE MAPPING**: processing the "Material" texture. You MUST align the texture's perspective to match the room's vanishing points. The floor tiles must look like they physically exist in that 3D space.
-        3. **SCALE**: Ensure the tile size is realistic for the room size (e.g., standard 60x60cm or marble slab scale).
-        4. **LIGHTING & SHADOWS**: CRITICAL. You must Preserve the original lighting interaction. The new floor must show the same shadows cast by furniture and the same reflections from windows/lights as the original floor.
-        5. **REALISM**: The result must be indistinguishable from a real photo. Blending must be seamless.
-
-        OUTPUT:
-        - Return ONLY the generated image.
-        - **IMPORTANT**: The output image MUST have the EXACT SAME aspect ratio and dimensions as the input "Room" image. Do NOT crop, trim, or resize the image. Only replace the floor texture.
+        Task: COMPLETELY REPLACE the existing floor in the "Room" image with the "Material" texture provided.
+        
+        Strict Requirements:
+        1. **High Quality & Clarity**: The final image must be crisp, sharp, and Photorealistic (4K style).
+        2. **Texture Visibility**: The new material texture must be VERY CLEAR and distinct. Do NOT blur the floor.
+        3. **Seamless Integration**: Respect the room's original perspective, vanishing points, and lighting.
+        4. **Preserve Context**: Keep all furniture, walls, and shadows exactly as they are. Only change the floor surface.
+        5. **Lighting**: Apply the room's natural lighting and shadows onto the new floor for realism.
+        6. Output ONLY the final modified image.
         `;
 
-        const payload = {
-            contents: [{
-                parts: [
-                    { text: prompt },
-                    { inlineData: { mimeType: roomMime, data: roomBuffer.toString('base64') } },
-                    { inlineData: { mimeType: tileMime, data: tileBuffer.toString('base64') } }
-                ]
-            }]
-        };
-
-        console.log(`[Service] Trying visualization with model: ${modelName}`);
-        return await axios.post(url, payload, {
-            headers: { 'Content-Type': 'application/json' }
-        });
-    };
-
-    // 3. Loop through models
-    let lastError = null;
-    for (const model of modelsToTry) {
-        try {
-            const response = await tryModel(model);
-
-            const candidate = response.data.candidates?.[0];
-            if (!candidate) continue; // Try next value
-
-            // Extract Image
-            for (const part of candidate.content.parts) {
-                if (part.inlineData) {
-                    const mimeType = part.inlineData.mimeType || 'image/png';
-                    return `data:${mimeType};base64,${part.inlineData.data}`;
+        const imageParts = [
+            {
+                inlineData: {
+                    data: roomBuffer.toString("base64"),
+                    mimeType: roomMime
+                }
+            },
+            {
+                inlineData: {
+                    data: tileBuffer.toString("base64"),
+                    mimeType: tileMime
                 }
             }
-            // If we got text instead of image, log it and try next model
-            const textPart = candidate.content.parts.find(p => p.text);
-            if (textPart) {
-                console.warn(`[Service] ${model} returned text instead of image:`, textPart.text.substring(0, 50) + "...");
-            }
+        ];
 
-        } catch (error) {
-            console.warn(`[Service] Model ${model} failed:`, error.response?.data?.error?.message || error.message);
-            lastError = error;
-            // Continue to next model
-            if (error.response?.status === 401 || error.response?.status === 403) {
-                // If key is invalid, no point trying other models with same key
-                throw new Error("Invalid API Key");
+        const result = await model.generateContent([prompt, ...imageParts]);
+        const response = await result.response;
+
+        // Check for inline image data in candidates
+        const fs = require('fs');
+        fs.writeFileSync('gemini_response_debug.json', JSON.stringify(response, null, 2));
+
+        if (response.candidates && response.candidates.length > 0) {
+            const candidate = response.candidates[0];
+            const imagePart = candidate.content.parts.find(part => part.inlineData);
+
+            if (imagePart && imagePart.inlineData) {
+                console.log("[Service] Image generated successfully.");
+                return `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
             }
         }
-    }
 
-    // 4. If all failed
-    throw new Error('Failed to visualize tiles with all available AI models. ' + (lastError?.message || ''));
+        // Check for block reason
+        if (response.promptFeedback && response.promptFeedback.blockReason) {
+            throw new Error(`Model blocked request: ${response.promptFeedback.blockReason}`);
+        }
+
+        throw new Error("Model returned no image data.");
+
+    } catch (error) {
+        console.error(`[Service] Visualization failed: ${error.message}`);
+        throw new Error(`Failed to visualize tiles: ${error.message}`);
+    }
 };
 
 const generateTileSuggestion = async (roomBuffer, tileBuffer, roomMime, tileMime) => {
     // We check if GEMINI_API_KEY is available as preferred fallback for text
-    const apiKey = process.env.GEMINI_API_KEY || process.env.GEMINI_FLASH_25_KEY;
+    // User preference: 2.5 key
+    const apiKey = process.env['GEMINI_FLASH_2.5_KEY'] || process.env.GEMINI_API_KEY;
 
-    // Model: gemini-1.5-flash is good for value/speed. 
+    // Model: gemini-2.5-flash is good for value/speed. 
     // Using a safe fallback model name.
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
     const prompt = `
     You are a sarcastic high-end interior designer.
