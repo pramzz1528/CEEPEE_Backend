@@ -1,0 +1,13 @@
+node_modules
+.env
+.DS_Store
+coverage
+dist
+build
+*.log
+debug_*.txt
+gemini_response_debug.json
+# Ignore all debug/log files in subdirectories
+**/*.log
+**/debug_*.txt
+**/gemini_response_debug.json

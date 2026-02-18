@@ -58,12 +58,7 @@ const generateText = async (prompt) => {
     // Only use Google SDK if we have a valid Google Key (AIza...)
     // If apiKey is 'sk-', validGoogleKey will be null unless process.env.GEMINI_API_KEY is explicitly set separate.
 
-    let validGoogleKey = null;
-    if (process.env.GEMINI_API_KEY && !process.env.GEMINI_API_KEY.startsWith('sk-')) {
-        validGoogleKey = process.env.GEMINI_API_KEY;
-    } else if (apiKey && !apiKey.startsWith('sk-')) {
-        validGoogleKey = apiKey;
-    }
+    let validGoogleKey = process.env.GEMINI_API_KEY;
 
     if (!validGoogleKey) {
         // If we only have an sk- key and it failed, we must stop.
@@ -123,12 +118,7 @@ const generateImage = async (prompt) => {
     }
 
     // 2. Google Fallback
-    let validGoogleKey = null;
-    if (process.env.GEMINI_API_KEY && !process.env.GEMINI_API_KEY.startsWith('sk-')) {
-        validGoogleKey = process.env.GEMINI_API_KEY;
-    } else if (apiKey && !apiKey.startsWith('sk-')) {
-        validGoogleKey = apiKey;
-    }
+    let validGoogleKey = process.env.GEMINI_API_KEY;
 
     if (!validGoogleKey) {
         throw new Error('No valid Google API Key available for image generation fallback.');
@@ -201,11 +191,10 @@ const matchRoomAndTile = async (prompt, rooms, materials) => {
 
 const visualizeTiles = async (roomBuffer, tileBuffer, roomMime, tileMime) => {
     // User requested "Gemini 2.5" key.
-    // We Map 'GEMINI_FLASH_2.5_KEY' to this function.
-    // Note: dot notation for env var with dot needs bracket request types usually: process.env['GEMINI_FLASH_2.5_KEY']
-    const apiKey = process.env['GEMINI_FLASH_2.5_KEY'] || process.env.GEMINI_API_KEY;
+    // Switching to standard GEMINI_API_KEY as the specialized key was expired.
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-        throw new Error('AI API Key is not configured (checked GEMINI_FLASH_2.5_KEY)');
+        throw new Error('AI API Key is not configured (checked GEMINI_API_KEY)');
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
@@ -213,10 +202,12 @@ const visualizeTiles = async (roomBuffer, tileBuffer, roomMime, tileMime) => {
     // Current latest is gemini-2.0-flash or gemini-1.5-flash. Users often round up or misremember numbers.
     // User requested "Gemini 2.5".
     // "gemini-2.5-flash-image" is available and likely the correct model for image generation tasks.
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-image" });
+    // "gemini-2.0-flash-exp" involves multimodal capabilities including image reasoning/generation
+    // User requested Gemini 2.5 Flash
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     try {
-        console.log(`[Service] Trying visualization with model: gemini-2.5-flash-image using provided specialized key.`);
+        console.log(`[Service] Trying visualization with model: gemini-2.5-flash (API Key: GEMINI_API_KEY).`);
 
         const prompt = `
         ACT AS AN EXPERT ARCHITECTURAL VISUALIZER.
@@ -278,8 +269,7 @@ const visualizeTiles = async (roomBuffer, tileBuffer, roomMime, tileMime) => {
 
 const generateTileSuggestion = async (roomBuffer, tileBuffer, roomMime, tileMime) => {
     // We check if GEMINI_API_KEY is available as preferred fallback for text
-    // User preference: 2.5 key
-    const apiKey = process.env['GEMINI_FLASH_2.5_KEY'] || process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
 
     // Model: gemini-2.5-flash is good for value/speed. 
     // Using a safe fallback model name.
