@@ -44,6 +44,11 @@ router.post('/register', async (req, res) => {
     try {
         const { username, password } = req.body;
 
+        // Space validation for password
+        if (/\s/.test(password)) {
+            return res.status(400).json({ message: 'Password cannot contain spaces' });
+        }
+
         // Check if user exists
         const existingUser = await User.findOne({ username });
         if (existingUser) {
