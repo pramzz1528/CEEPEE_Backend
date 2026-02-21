@@ -38,7 +38,6 @@ const visualizeTile = async (req, res) => {
             roomBuffer = file.buffer;
             roomMime = file.mimetype;
         } else if (body.roomUrl) {
-        } else if (body.roomUrl) {
             console.log(`[Visualizer] Downloading Room from URL: ${body.roomUrl}`);
             const downloaded = await downloadImage(body.roomUrl);
             roomBuffer = downloaded.buffer;

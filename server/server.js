@@ -34,6 +34,7 @@ const authRoutes = require('./routes/authRoutes');
 
 app.use('/api/viz', visualizerRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api', authRoutes); // Allow /api/login and /api/register to work directly
 app.use('/api', apiRoutes);
 
 // Root

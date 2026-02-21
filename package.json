@@ -5,6 +5,7 @@
     "scripts": {
         "start": "npm start --prefix server",
         "dev": "npm run dev --prefix server",
+        "build": "echo 'No build required for backend'",
         "install-all": "npm install --prefix server"
     },
     "dependencies": {

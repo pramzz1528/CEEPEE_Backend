@@ -15,6 +15,11 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
 
+        // Check for spaces in password (should be caught by frontend, but good for security)
+        if (/\s/.test(password)) {
+            return res.status(400).json({ message: 'Password cannot contain spaces' });
+        }
+
         // Compare password directly (Plain text as requested - NOT SECURE)
         if (user.password !== password) {
             console.log('Invalid password for:', username);
